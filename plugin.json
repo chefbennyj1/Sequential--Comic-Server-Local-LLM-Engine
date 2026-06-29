@@ -3,6 +3,5 @@
   "version": "1.0.0",
   "description": "Core provider for local AI inference via llama.cpp. Exposes /generate endpoints for other plugins.",
   "author": "Benjamin & Gemini",
-  "file": "engine.js",
   "enabled": true
 }

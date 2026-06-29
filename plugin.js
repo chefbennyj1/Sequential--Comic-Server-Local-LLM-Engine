@@ -68,28 +68,47 @@ class LocalLLMEngine {
         console.log(`[LocalLlmEngine] Starting llama-server on port ${this.port}...`);
         
         try {
-            this.process = spawn(this.llamaServerPath, [
-                '-m', this.modelPath,
-                '--port', this.port.toString(),
-                '-c', '8192' // Ensure we have enough context window for our sliding pages + char bibles
-            ]);
+            return new Promise((resolve) => {
+                this.process = spawn(this.llamaServerPath, [
+                    '-m', this.modelPath,
+                    '--port', this.port.toString(),
+                    '-c', '8192' // Ensure we have enough context window for our sliding pages + char bibles
+                ]);
 
-            this.process.stderr.on('data', (data) => {
-                // llama.cpp prints almost everything to stderr
-                if (data.toString().includes("HTTP server listening")) {
-                    this.isRunning = true;
-                    console.log(`[LocalLlmEngine] Server Ready on port ${this.port}.`);
-                }
+                let isResolved = false;
+                const startupTimeout = setTimeout(() => {
+                    if (!isResolved) {
+                        console.error("[LocalLlmEngine] Startup timed out (45s).");
+                        isResolved = true;
+                        resolve(false);
+                    }
+                }, 45000); // 45 seconds for heavy models
+
+                this.process.stderr.on('data', (data) => {
+                    const output = data.toString();
+                    // llama.cpp prints almost everything to stderr
+                    if (output.includes("HTTP server listening")) {
+                        this.isRunning = true;
+                        console.log(`[LocalLlmEngine] Server Ready on port ${this.port}.`);
+                        if (!isResolved) {
+                            clearTimeout(startupTimeout);
+                            isResolved = true;
+                            resolve(true);
+                        }
+                    }
+                });
+
+                this.process.on('close', () => {
+                    this.isRunning = false;
+                    this.process = null;
+                    console.log(`[LocalLlmEngine] Server stopped.`);
+                    if (!isResolved) {
+                        clearTimeout(startupTimeout);
+                        isResolved = true;
+                        resolve(false);
+                    }
+                });
             });
-
-            this.process.on('close', () => {
-                this.isRunning = false;
-                this.process = null;
-                console.log(`[LocalLlmEngine] Server stopped.`);
-            });
-
-            // Brief wait to allow the model to load into VRAM
-            return new Promise(resolve => setTimeout(() => resolve(true), 3500));
         } catch (err) {
             console.error("[LocalLlmEngine] Failed to spawn process:", err);
             return false;
