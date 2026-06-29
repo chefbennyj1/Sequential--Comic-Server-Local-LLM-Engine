@@ -1,0 +1,10 @@
+# Ignore heavy AI model files
+resources/*.gguf
+
+# Allow binaries and dlls to be tracked!
+!resources/*.exe
+!resources/*.dll
+
+# OS files
+.DS_Store
+Thumbs.db
