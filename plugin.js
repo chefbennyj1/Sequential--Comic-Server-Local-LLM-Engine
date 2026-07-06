@@ -16,6 +16,10 @@ class LocalLLMEngine {
         this.lastPresence = 0;
         this.presenceTimeoutMs = 120000;
 
+        // A manual dashboard Stop must hold until a manual Start; presence
+        // beats may not resurrect a deliberately stopped engine.
+        this.manualStop = false;
+
         // Convention over configuration: all assets go in the resources folder
         this.resourcesDir = path.join(__dirname, 'resources');
 
@@ -51,11 +55,13 @@ class LocalLLMEngine {
 
         // Add management endpoints (so we can build a dashboard toggle UI later)
         subRouter.post('/start', async (req, res) => {
+            this.manualStop = false;
             const success = await this.start();
             res.json({ ok: success, message: success ? 'Engine Started' : 'Failed to start engine (Check logs)' });
         });
 
         subRouter.post('/stop', (req, res) => {
+            this.manualStop = true;
             this.stop();
             res.json({ ok: true, message: 'Engine Stopped. VRAM freed.' });
         });
@@ -69,7 +75,7 @@ class LocalLLMEngine {
         // dashboard has been closed long enough.
         subRouter.post('/hooks/editor-presence', (req, res) => {
             this.lastPresence = Date.now();
-            if (!this.isRunning && !this.isStarting) {
+            if (!this.isRunning && !this.isStarting && !this.manualStop) {
                 this.start(); // not awaited: model load takes ~60s, beats keep coming
             }
             res.json({ ok: true, running: this.isRunning, starting: this.isStarting });
