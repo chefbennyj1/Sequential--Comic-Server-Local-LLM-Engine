@@ -177,6 +177,11 @@ class LocalLLMEngine {
         return false;
     }
 
+    // Called by PluginLoader when the server shuts down or restarts
+    shutdown() {
+        this.stop();
+    }
+
     stop() {
         if (!this.process) return;
         console.log("[LocalLlmEngine] Stopping server and freeing VRAM...");
